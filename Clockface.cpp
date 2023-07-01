@@ -16,9 +16,20 @@ Clockface::Clockface(Adafruit_GFX *display)
 void Clockface::setup(CWDateTime *dateTime)
 {
   this->_dateTime = dateTime;
+  drawSplashScreen(0xFFE0, "Downloading");
 
-  deserializeDefinition();
-  clockfaceSetup();
+  if (deserializeDefinition()) {
+    clockfaceSetup();
+  }
+}
+
+void Clockface::drawSplashScreen(uint16_t color, const char *msg) {
+  
+  Locator::getDisplay()->fillRect(0, 0, 64, 64, 0);
+  Locator::getDisplay()->drawBitmap(19, 18, CW_ICON_CANVAS, 27, 32, color);
+  
+  StatusController::getInstance()->printCenter("- Canvas -", 7);
+  StatusController::getInstance()->printCenter(msg, 61);
 }
 
 void Clockface::update()
@@ -45,7 +56,7 @@ void Clockface::setFont(const char *fontName)
   {
     Locator::getDisplay()->setFont(&Picopixel);
   }
-  else if (strcmp(fontName, "atari") == 0)
+  else if (strcmp(fontName, "square") == 0)
   {
     Locator::getDisplay()->setFont(&atariFont);
   }
@@ -176,7 +187,6 @@ void Clockface::clockfaceLoop()
 
 void Clockface::renderElements(JsonArrayConst elements)
 {
-
   for (JsonVariantConst value : elements)
   {
     const char *type = value["type"].as<const char *>();
@@ -219,11 +229,18 @@ void Clockface::renderElements(JsonArrayConst elements)
   }
 }
 
-void Clockface::deserializeDefinition()
+bool Clockface::deserializeDefinition()
 {
   WiFiClientSecure client;
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "raw.githubusercontent.com", "/jnthas/clock-club/v1/pac-man.json", 443);
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "192.168.3.19", "/nyan-cat.json", 4443);
+
+
+  if (ClockwiseParams::getInstance()->canvasServer.isEmpty() || ClockwiseParams::getInstance()->canvasFile.isEmpty()) {
+    drawSplashScreen(0xC904, "Params werent set");
+    return false;
+  }
+
 
   String server = ClockwiseParams::getInstance()->canvasServer;
   String file = String("/" + ClockwiseParams::getInstance()->canvasFile + ".json");
@@ -239,14 +256,17 @@ void Clockface::deserializeDefinition()
   DeserializationError error = deserializeJson(doc, client);
   if (error)
   {
+    drawSplashScreen(0xC904, "Error! Check logs");
+
     Serial.print("deserializeJson() failed: ");
     Serial.println(error.c_str());
     client.stop();
-    return;
+    return false;
   }
 
   //TODO check if json is valid
 
   Serial.printf("[Canvas] Building clockface '%s' by %s, version %d\n", doc["name"].as<const char *>(), doc["author"].as<const char *>(), doc["version"].as<const uint16_t>());
   client.stop();
+  return true;
 }
