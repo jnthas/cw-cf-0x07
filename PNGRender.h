@@ -7,7 +7,8 @@
 #define IMAGE_BUFFER_SIZE 1024
 
 static PNG png;
-
+static unsigned char decodedArray[IMAGE_BUFFER_SIZE];
+static size_t decodedArrayLength;
 
 typedef struct png_position
 {
@@ -29,9 +30,6 @@ static void PNGDraw(PNGDRAW *pDraw)
 
 static bool openImage(const char *base64Image)
 {
-  unsigned char decodedArray[IMAGE_BUFFER_SIZE];
-  size_t decodedArrayLength;
-
   mbedtls_base64_decode(decodedArray, IMAGE_BUFFER_SIZE, &decodedArrayLength, (const unsigned char *)base64Image, strlen(base64Image));
 
   int rc = png.openRAM(decodedArray, decodedArrayLength, PNGDraw); 
