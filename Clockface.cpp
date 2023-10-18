@@ -174,7 +174,7 @@ void Clockface::clockfaceLoop()
       unsigned long currentMillis = millis();
       unsigned long currentSecond = _dateTime->getSecond();
     
-      if (currentSecond == 0 || currentSecond%(loopDelay/1000) == 0) {
+      if (currentSecond == 0 || (currentSecond*1000)%loopDelay == 0) {
         sprite->_currentFrameCount = 0;
         sprite->_lastResetTime = currentMillis;
       }
@@ -247,7 +247,7 @@ bool Clockface::deserializeDefinition()
 
   if (server.startsWith("raw.")) {
     port = 443;
-    file = String("/jnthas/clock-club/main/shared" + file);
+    file = String("/robegamesios/clock-club/main/shared" + file);
   }
 
   ClockwiseHttpClient::getInstance()->httpGet(&client, server.c_str(), file.c_str(), port);
