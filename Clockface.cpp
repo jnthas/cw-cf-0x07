@@ -2,7 +2,6 @@
 #include "Clockface.h"
 
 unsigned long lastMillis = 0;
-unsigned long lastMillisFrames = 0;
 
 // TODO document size
 static DynamicJsonDocument doc(32768);
@@ -35,13 +34,9 @@ void Clockface::drawSplashScreen(uint16_t color, const char *msg) {
 void Clockface::update()
 {
   // Render animation
-  if (millis() - lastMillisFrames >= frameDelay)
-  {
-    clockfaceLoop();
-    lastMillisFrames = millis();
-  }
+  clockfaceLoop();
 
-  // Update Date/Time
+  // Update Date/Time - Using a fixed interval (1000 milliseconds)
   if (millis() - lastMillis >= 1000)
   {
     refreshDateTime();
@@ -117,8 +112,6 @@ void Clockface::clockfaceSetup()
   // Clear screen
   Locator::getDisplay()->fillRect(0, 0, 64, 64, doc["bgColor"].as<const uint16_t>());
 
-  frameDelay = doc["delay"].as<const uint16_t>();
-
   // Draw static elements
   renderElements(doc["setup"].as<JsonArrayConst>());
 
@@ -157,33 +150,37 @@ void Clockface::createSprites()
 
 void Clockface::clockfaceLoop()
 {
+  if (sprites.empty()) {
+    return;
+  }
 
   for (const auto& sprite : sprites) {
+    uint8_t totalFrames = sprite->_totalFrames;
+    uint32_t loopDelay = doc["loop"][sprite->_spriteReference]["loopDelay"].as<uint32_t>();
+    uint16_t frameDelay = doc["loop"][sprite->_spriteReference]["frameDelay"].as<uint16_t>();
+
+    if (millis() - sprite->_lastMillisSpriteFrames >= frameDelay && sprite->_currentFrameCount < totalFrames)
+    {
+      sprite->incFrame();
+        
+      // Render the frame of the sprite
+      renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
+      
+      sprite->_currentFrameCount += 1;
+      sprite->_lastMillisSpriteFrames = millis();
+    }
+
+    if (millis() - sprite->_lastResetTime >= loopDelay) {
+      unsigned long currentMillis = millis();
+      unsigned long currentSecond = _dateTime->getSecond();
     
-    // Locator::getDisplay()->fillRect(
-    //       sprite->getX(),
-    //       sprite->getY(),
-    //       sprite->getWidth(),
-    //       sprite->getHeight(),
-    //       doc["bgColor"].as<const uint16_t>());
-
-      // s.incX(value["x1"].as<const int8_t>());
-      // s.incY(value["y1"].as<const int8_t>());
-
-      // if ((s.pace > 0 && s.x >= value["x1"].as<const int8_t>() && s.y >= value["y1"].as<const int8_t>() ||
-      //     (s.pace < 0 && s.x <= value["x1"].as<const int8_t>() && s.y <= value["y1"].as<const int8_t>()))) {
-
-      //   s.x = value["x"].as<const int8_t>();
-      //   s.y = value["y"].as<const int8_t>();
-      // }
-
-    sprite->incFrame();
-
-    //Serial.printf("X: %d Y: %d Frame: %d Count: %d Pace: %d\n", s.x, s.y, s.currentFrame, s.frameCount, s.pace);
-    renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
-  }
+      if (currentSecond == 0 || currentSecond%(loopDelay/1000) == 0) {
+        sprite->_currentFrameCount = 0;
+        sprite->_lastResetTime = currentMillis;
+      }
+    }
+  } 
 }
-
 
 void Clockface::renderElements(JsonArrayConst elements)
 {
@@ -231,7 +228,9 @@ void Clockface::renderElements(JsonArrayConst elements)
 
 bool Clockface::deserializeDefinition()
 {
-  WiFiClientSecure client;
+
+  WiFiClient client;
+  //WiFiClientSecure client;
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "raw.githubusercontent.com", "/jnthas/clock-club/v1/pac-man.json", 443);
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "192.168.3.19", "/nyan-cat.json", 4443);
 
