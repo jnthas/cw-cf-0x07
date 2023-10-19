@@ -38,6 +38,7 @@ class Clockface : public IClockface
 private:
   Adafruit_GFX *_display;
   CWDateTime *_dateTime;
+  uint16_t delay;
 
   void setFont(const char *fontName);
   bool deserializeDefinition();

@@ -112,6 +112,8 @@ void Clockface::clockfaceSetup()
   // Clear screen
   Locator::getDisplay()->fillRect(0, 0, 64, 64, doc["bgColor"].as<const uint16_t>());
 
+  delay = doc["delay"].as<const uint16_t>();
+
   // Draw static elements
   renderElements(doc["setup"].as<JsonArrayConst>());
 
@@ -156,8 +158,8 @@ void Clockface::clockfaceLoop()
 
   for (const auto& sprite : sprites) {
     uint8_t totalFrames = sprite->_totalFrames;
-    uint32_t loopDelay = doc["loop"][sprite->_spriteReference]["loopDelay"].as<uint32_t>();
-    uint16_t frameDelay = doc["loop"][sprite->_spriteReference]["frameDelay"].as<uint16_t>();
+    uint32_t loopDelay = doc["loop"][sprite->_spriteReference]["loopDelay"].as<uint32_t>() ?: delay;
+    uint16_t frameDelay = doc["loop"][sprite->_spriteReference]["frameDelay"].as<uint16_t>() ?: delay;
 
     if (millis() - sprite->_lastMillisSpriteFrames >= frameDelay && sprite->_currentFrameCount < totalFrames)
     {
