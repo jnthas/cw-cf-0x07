@@ -229,8 +229,8 @@ void Clockface::renderElements(JsonArrayConst elements)
 bool Clockface::deserializeDefinition()
 {
 
-  WiFiClient client;
-  //WiFiClientSecure client;
+  // WiFiClient client;
+  WiFiClientSecure client;
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "raw.githubusercontent.com", "/jnthas/clock-club/v1/pac-man.json", 443);
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "192.168.3.19", "/nyan-cat.json", 4443);
 
@@ -247,7 +247,7 @@ bool Clockface::deserializeDefinition()
 
   if (server.startsWith("raw.")) {
     port = 443;
-    file = String("/jnthas/clock-club/main/shared" + file);
+    file = String("/robegamesios/clock-club/main/shared" + file);
   }
 
   ClockwiseHttpClient::getInstance()->httpGet(&client, server.c_str(), file.c_str(), port);
