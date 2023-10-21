@@ -156,20 +156,86 @@ void Clockface::clockfaceLoop()
     return;
   }
 
-  for (const auto& sprite : sprites) {
+  for (auto& sprite : sprites) {
     uint8_t totalFrames = sprite->_totalFrames;
     uint32_t loopDelay = doc["loop"][sprite->_spriteReference]["loopDelay"].as<uint32_t>() ?: delay;
     uint16_t frameDelay = doc["loop"][sprite->_spriteReference]["frameDelay"].as<uint16_t>() ?: delay;
+    unsigned long moveStartTime = doc["loop"][sprite->_spriteReference]["moveStartTime"].as<unsigned long>() ?: 1;
+    unsigned long moveDuration = doc["loop"][sprite->_spriteReference]["moveDuration"].as<unsigned long>() ?: 0;
+    int8_t moveTargetX = doc["loop"][sprite->_spriteReference]["moveTargetX"].as<int8_t>() ?: -1;
+    int8_t moveTargetY = doc["loop"][sprite->_spriteReference]["moveTargetY"].as<int8_t>() ?: -1;
+    bool shouldReturnToOrigin = doc["loop"][sprite->_spriteReference]["shouldReturnToOrigin"].as<bool>() ?: false;
 
     if (millis() - sprite->_lastMillisSpriteFrames >= frameDelay && sprite->_currentFrameCount < totalFrames)
     {
-      sprite->incFrame();
-        
-      // Render the frame of the sprite
-      renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
+
+      // Check if the sprite is moving
+      if (sprite->isMoving()) {
+          unsigned long currentTime = millis();
+          unsigned long elapsedTime = currentTime - sprite->getMoveStartTime();
+          float progress = static_cast<float>(elapsedTime) / sprite->getMoveDuration();
+
+          int8_t oldX = sprite->getX();
+          int8_t oldY = sprite->getY();
+          int8_t newX = sprite->lerp(sprite->getMoveInitialX(), sprite->getMoveTargetX(), progress);
+          int8_t newY = sprite->lerp(sprite->getMoveInitialY(), sprite->getMoveTargetY(), progress);
+          int16_t deltaWidth = abs(oldX - newX);
+          int16_t deltaHeight = abs(oldY - newY);
+          int16_t originX = min(oldX, newX);
+          int16_t originY = min(oldY, newY);
+          int16_t drawWidth = sprite->getWidth() + max(oldX, newX) - originX;
+          int16_t drawHeight = sprite->getHeight() + max(oldY, newY) - originY;
+
+          // Erase the previous position
+          Locator::getDisplay()->fillRect(
+              originX,
+              originY,
+              drawWidth,
+              drawHeight,
+              doc["bgColor"].as<const uint16_t>());
+
+          if (progress <= 1) {
+            // Update the sprite's position
+            sprite->setX(newX);
+            sprite->setY(newY);
+
+            // Render the new frame of the sprite
+            sprite->incFrame();
+            renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
       
-      sprite->_currentFrameCount += 1;
-      sprite->_lastMillisSpriteFrames = millis();
+            sprite->_currentFrameCount += 1;
+            sprite->_lastMillisSpriteFrames = millis();
+
+          } else {
+            // Movement is complete
+            sprite->setX(sprite->getMoveTargetX());
+            sprite->setY(sprite->getMoveTargetY());
+            renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
+              
+            // Check if the sprite should return to its initial position
+            if (sprite->shouldReturnToOrigin()) {
+              sprite->startMoving(sprite->getMoveInitialX(), sprite->getMoveInitialY(), sprite->getMoveDuration(), false);
+            } else {
+              sprite->stopMoving();
+            }
+          }
+      } else {
+        if (moveDuration > 0 && (moveTargetX > -1 || moveTargetY > -1)) {
+          unsigned long currentMillis = millis();
+          unsigned long currentSecond = _dateTime->getSecond();
+    
+          if (currentSecond == 0 || (currentSecond*1000)%moveStartTime == 0) {
+            sprite->startMoving(moveTargetX, moveTargetY, moveDuration, shouldReturnToOrigin);
+          }
+        }
+        sprite->incFrame();
+        
+        // Render the frame of the sprite
+        renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
+      
+        sprite->_currentFrameCount += 1;
+        sprite->_lastMillisSpriteFrames = millis();
+      }
     }
 
     if (millis() - sprite->_lastResetTime >= loopDelay) {
