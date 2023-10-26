@@ -158,6 +158,9 @@ void Clockface::handleSpriteAnimation(std::shared_ptr<CustomSprite>& sprite) {
     if (millis() - sprite->_lastMillisSpriteFrames >= frameDelay && sprite->_currentFrameCount < totalFrames) {
         sprite->incFrame();
 
+        // handle sprite movement
+        handleSpriteMovement(sprite);
+
         // Render the frame of the sprite
         renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
 
@@ -212,13 +215,11 @@ void Clockface::handleSpriteMovement(std::shared_ptr<CustomSprite>& sprite) {
             // Update the sprite's position
             sprite->setX(newX);
             sprite->setY(newY);
-            renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
 
         } else if (sprite->shouldReturnToOrigin()) {
             // Movement is complete
             sprite->setX(sprite->_moveTargetX);
             sprite->setY(sprite->_moveTargetY);
-            renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
 
             if (!sprite->_isReversing) {
                 sprite->reverseMoving(moveInitialX, moveInitialY);
@@ -246,7 +247,6 @@ void Clockface::clockfaceLoop() {
 
     for (auto& sprite : sprites) {
         handleSpriteAnimation(sprite);
-        handleSpriteMovement(sprite);
     }
 }
 
