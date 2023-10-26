@@ -49,6 +49,8 @@ private:
   void createSprites();
   void refreshDateTime();
   void drawSplashScreen(uint16_t color, const char *msg);
+  void handleSpriteAnimation(std::shared_ptr<CustomSprite> &sprite);
+  void handleSpriteMovement(std::shared_ptr<CustomSprite> &sprite);
 
   std::vector<std::shared_ptr<CustomSprite>> sprites;
 
