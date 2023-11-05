@@ -230,12 +230,11 @@ void Clockface::renderElements(JsonArrayConst elements)
 
 bool Clockface::deserializeDefinition()
 {
-
-  // WiFiClient client;
   WiFiClientSecure client;
+
+  //WiFiClient client;
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "raw.githubusercontent.com", "/jnthas/clock-club/v1/pac-man.json", 443);
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "192.168.3.19", "/nyan-cat.json", 4443);
-
 
   if (ClockwiseParams::getInstance()->canvasServer.isEmpty() || ClockwiseParams::getInstance()->canvasFile.isEmpty()) {
     drawSplashScreen(0xC904, "Params werent set");
