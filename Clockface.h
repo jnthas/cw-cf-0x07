@@ -38,7 +38,7 @@ class Clockface : public IClockface
 private:
   Adafruit_GFX *_display;
   CWDateTime *_dateTime;
-  uint16_t frameDelay;
+  uint16_t delay;
 
   void setFont(const char *fontName);
   bool deserializeDefinition();
@@ -49,6 +49,8 @@ private:
   void createSprites();
   void refreshDateTime();
   void drawSplashScreen(uint16_t color, const char *msg);
+  void handleSpriteAnimation(std::shared_ptr<CustomSprite> &sprite);
+  void handleSpriteMovement(std::shared_ptr<CustomSprite> &sprite);
 
   std::vector<std::shared_ptr<CustomSprite>> sprites;
 

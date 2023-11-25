@@ -2,7 +2,6 @@
 #include "Clockface.h"
 
 unsigned long lastMillis = 0;
-unsigned long lastMillisFrames = 0;
 
 // TODO document size
 static DynamicJsonDocument doc(32768);
@@ -35,13 +34,9 @@ void Clockface::drawSplashScreen(uint16_t color, const char *msg) {
 void Clockface::update()
 {
   // Render animation
-  if (millis() - lastMillisFrames >= frameDelay)
-  {
-    clockfaceLoop();
-    lastMillisFrames = millis();
-  }
+  clockfaceLoop();
 
-  // Update Date/Time
+  // Update Date/Time - Using a fixed interval (1000 milliseconds)
   if (millis() - lastMillis >= 1000)
   {
     refreshDateTime();
@@ -117,7 +112,7 @@ void Clockface::clockfaceSetup()
   // Clear screen
   Locator::getDisplay()->fillRect(0, 0, 64, 64, doc["bgColor"].as<const uint16_t>());
 
-  frameDelay = doc["delay"].as<const uint16_t>();
+  delay = doc["delay"].as<const uint16_t>();
 
   // Draw static elements
   renderElements(doc["setup"].as<JsonArrayConst>());
@@ -155,35 +150,105 @@ void Clockface::createSprites()
   }
 }
 
-void Clockface::clockfaceLoop()
-{
+void Clockface::handleSpriteAnimation(std::shared_ptr<CustomSprite>& sprite) {
+    uint8_t totalFrames = sprite->_totalFrames;
+    uint32_t loopDelay = doc["loop"][sprite->_spriteReference]["loopDelay"].as<uint32_t>() ?: delay;
+    uint16_t frameDelay = doc["loop"][sprite->_spriteReference]["frameDelay"].as<uint16_t>() ?: delay;
 
-  for (const auto& sprite : sprites) {
-    
-    // Locator::getDisplay()->fillRect(
-    //       sprite->getX(),
-    //       sprite->getY(),
-    //       sprite->getWidth(),
-    //       sprite->getHeight(),
-    //       doc["bgColor"].as<const uint16_t>());
+    if (millis() - sprite->_lastMillisSpriteFrames >= frameDelay && sprite->_currentFrameCount < totalFrames) {
+        sprite->incFrame();
 
-      // s.incX(value["x1"].as<const int8_t>());
-      // s.incY(value["y1"].as<const int8_t>());
+        // handle sprite movement
+        handleSpriteMovement(sprite);
 
-      // if ((s.pace > 0 && s.x >= value["x1"].as<const int8_t>() && s.y >= value["y1"].as<const int8_t>() ||
-      //     (s.pace < 0 && s.x <= value["x1"].as<const int8_t>() && s.y <= value["y1"].as<const int8_t>()))) {
+        // Render the frame of the sprite
+        renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
 
-      //   s.x = value["x"].as<const int8_t>();
-      //   s.y = value["y"].as<const int8_t>();
-      // }
+        sprite->_currentFrameCount += 1;
+        sprite->_lastMillisSpriteFrames = millis();
+    }
 
-    sprite->incFrame();
+    if (millis() - sprite->_lastResetTime >= loopDelay) {
+        unsigned long currentMillis = millis();
+        unsigned long currentSecond = _dateTime->getSecond();
 
-    //Serial.printf("X: %d Y: %d Frame: %d Count: %d Pace: %d\n", s.x, s.y, s.currentFrame, s.frameCount, s.pace);
-    renderImage(doc["sprites"][sprite->_spriteReference][sprite->_currentFrame]["image"].as<const char *>(), sprite->getX(), sprite->getY());
-  }
+        if ((currentSecond * 1000) % loopDelay == 0) {
+            sprite->_currentFrameCount = 0;
+            sprite->_lastResetTime = currentMillis;
+        }
+    }
 }
 
+void Clockface::handleSpriteMovement(std::shared_ptr<CustomSprite>& sprite) {
+    unsigned long moveStartTime = doc["loop"][sprite->_spriteReference]["moveStartTime"].as<unsigned long>() ?: 1;
+    unsigned long moveDuration = doc["loop"][sprite->_spriteReference]["moveDuration"].as<unsigned long>() ?: 0;
+    int8_t moveInitialX = doc["loop"][sprite->_spriteReference]["x"].as<int8_t>() ?:0;
+    int8_t moveInitialY = doc["loop"][sprite->_spriteReference]["y"].as<int8_t>() ?: 0;
+    int8_t moveTargetX = doc["loop"][sprite->_spriteReference]["moveTargetX"].as<int8_t>() ?: -1;
+    int8_t moveTargetY = doc["loop"][sprite->_spriteReference]["moveTargetY"].as<int8_t>() ?: -1;
+    bool shouldReturnToOrigin = doc["loop"][sprite->_spriteReference]["shouldReturnToOrigin"].as<bool>() ?: false;
+
+    // Check if the sprite is moving
+    if (sprite->isMoving()) {
+        unsigned long currentTime = millis();
+        unsigned long elapsedTime = currentTime - sprite->_moveStartTime;
+        float progress = (static_cast<float>(elapsedTime) / sprite->_moveDuration);
+
+        int8_t oldX = sprite->getX();
+        int8_t oldY = sprite->getY();
+        int8_t newX = sprite->lerp(sprite->_moveInitialX, sprite->_moveTargetX, progress);
+        int8_t newY = sprite->lerp(sprite->_moveInitialY, sprite->_moveTargetY, progress);
+        int8_t originX = min(oldX, newX);
+        int8_t originY = min(oldY, newY);
+        int8_t drawWidth = sprite->getWidth() + max(oldX, newX) - originX;
+        int8_t drawHeight = sprite->getHeight() + max(oldY, newY) - originY;
+
+        // Erase the previous position
+        Locator::getDisplay()->fillRect(
+            originX,
+            originY,
+            drawWidth,
+            drawHeight,
+            doc["bgColor"].as<const uint16_t>());
+
+        if (progress <= 1) {
+            // Update the sprite's position
+            sprite->setX(newX);
+            sprite->setY(newY);
+
+        } else if (sprite->shouldReturnToOrigin()) {
+            // Movement is complete
+            sprite->setX(sprite->_moveTargetX);
+            sprite->setY(sprite->_moveTargetY);
+
+            if (!sprite->_isReversing) {
+                sprite->reverseMoving(moveInitialX, moveInitialY);
+            }
+        } else {
+            sprite->stopMoving();
+        }
+    }
+
+    if ((moveDuration > 0 && (moveTargetX > -1 || moveTargetY > -1)) && (millis() - sprite->_lastResetMoveTime >= moveStartTime)) {
+        unsigned long currentMillis = millis();
+        unsigned long currentSecond = _dateTime->getSecond();
+
+        if ((currentSecond * 1000) % moveStartTime == 0) {
+            sprite->_lastResetMoveTime = currentMillis;
+            sprite->startMoving(moveTargetX, moveTargetY, moveDuration, shouldReturnToOrigin);
+        }
+    }
+}
+
+void Clockface::clockfaceLoop() {
+    if (sprites.empty()) {
+        return;
+    }
+
+    for (auto& sprite : sprites) {
+        handleSpriteAnimation(sprite);
+    }
+}
 
 void Clockface::renderElements(JsonArrayConst elements)
 {
@@ -231,12 +296,11 @@ void Clockface::renderElements(JsonArrayConst elements)
 
 bool Clockface::deserializeDefinition()
 {
+  WiFiClientSecure client;
 
   //WiFiClient client;
-  WiFiClientSecure client;
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "raw.githubusercontent.com", "/jnthas/clock-club/v1/pac-man.json", 443);
   //ClockwiseHttpClient::getInstance()->httpGet(&client, "192.168.3.19", "/nyan-cat.json", 4443);
-
 
   if (ClockwiseParams::getInstance()->canvasServer.isEmpty() || ClockwiseParams::getInstance()->canvasFile.isEmpty()) {
     drawSplashScreen(0xC904, "Params werent set");
@@ -250,7 +314,7 @@ bool Clockface::deserializeDefinition()
 
   if (server.startsWith("raw.")) {
     port = 443;
-    file = String("/jnthas/clock-club/main/shared" + file);
+    file = String("/robegamesios/clock-club/main/shared" + file);
   }
 
   ClockwiseHttpClient::getInstance()->httpGet(&client, server.c_str(), file.c_str(), port);
