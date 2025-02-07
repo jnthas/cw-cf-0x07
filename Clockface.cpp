@@ -314,7 +314,7 @@ bool Clockface::deserializeDefinition()
 
   if (server.startsWith("raw.")) {
     port = 443;
-    file = String("/robegamesios/clock-club/main/shared" + file);
+    file = String("/jnthas/clock-club/main/shared" + file);
   }
 
   ClockwiseHttpClient::getInstance()->httpGet(&client, server.c_str(), file.c_str(), port);
