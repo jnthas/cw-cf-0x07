@@ -16,7 +16,7 @@ typedef struct png_position
 } PNG_POSITION;
 
 
-static void PNGDraw(PNGDRAW *pDraw)
+static int PNGDraw(PNGDRAW *pDraw)
 {
   uint16_t usPixels[64];
   
@@ -25,6 +25,7 @@ static void PNGDraw(PNGDRAW *pDraw)
   png.getLineAsRGB565(pDraw, usPixels, PNG_RGB565_LITTLE_ENDIAN, 0xffffffff);
 
   Locator::getDisplay()->drawRGBBitmap(pPos->xoff, pPos->yoff + pDraw->y, usPixels, pDraw->iWidth, 1); 
+  return 1;
 }
 
 
